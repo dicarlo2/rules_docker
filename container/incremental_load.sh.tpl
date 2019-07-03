@@ -14,22 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -eu
-
 # This is a generated file that loads all docker layers built by "docker_build".
 
-function guess_runfiles() {
-    if [ -d ${BASH_SOURCE[0]}.runfiles ]; then
-        # Runfiles are adjacent to the current script.
-        echo "$( cd ${BASH_SOURCE[0]}.runfiles && pwd )"
-    else
-        # The current script is within some other script's runfiles.
-        mydir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-        echo $mydir | sed -e 's|\(.*\.runfiles\)/.*|\1|'
-    fi
-}
-
-RUNFILES="${PYTHON_RUNFILES:-$(guess_runfiles)}"
+# --- begin runfiles.bash initialization v2 ---
+# Copy-pasted from the Bazel Bash runfiles library v2.
+set -uo pipefail; f=bazel_tools/tools/bash/runfiles/runfiles.bash
+source "${RUNFILES_DIR:-/dev/null}/$f" 2>/dev/null || \
+  source "$(grep -sm1 "^$f " "${RUNFILES_MANIFEST_FILE:-/dev/null}" | cut -f2- -d' ')" 2>/dev/null || \
+  source "$0.runfiles/$f" 2>/dev/null || \
+  source "$(grep -sm1 "^$f " "$0.runfiles_manifest" | cut -f2- -d' ')" 2>/dev/null || \
+  source "$(grep -sm1 "^$f " "$0.exe.runfiles_manifest" | cut -f2- -d' ')" 2>/dev/null || \
+  { echo>&2 "ERROR: cannot find $f"; exit 1; }; f=; set -e
+# --- end runfiles.bash initialization v2 ---
 
 DOCKER="%{docker_tool_path}"
 
@@ -52,7 +48,7 @@ trap cleanup EXIT
 
 
 function load_legacy() {
-  local tarball="${RUNFILES}/$1"
+  local tarball="$(rlocation $1)"
 
   # docker load has elision of preloaded layers built in.
   echo "Loading legacy tarball base $1..."
@@ -107,7 +103,7 @@ function find_diffbase() {
   NEW_DIFF_IDS=()
   while test $# -gt 0
   do
-    local diff_id="$(cat "${RUNFILES}/$1")"
+    local diff_id="$(cat "$(rlocation $1)")"
     # Throwaway the layer, we only want diff id.
     shift 2
 
@@ -123,7 +119,7 @@ function find_diffbase() {
 
 function import_config() {
   # Create an image from the image configuration file.
-  local name="${RUNFILES}/$1"
+  local name="$(rlocation $1)"
   shift 1
 
   local tmp_dir="$(mktemp -d)"
@@ -155,8 +151,8 @@ function import_config() {
   # additional layers the Docker daemon already has.
   while test $# -gt 0
   do
-    local diff_id="$(cat "${RUNFILES}/$1")"
-    local layer="${RUNFILES}/$2"
+    local diff_id="$(cat "$(rlocation $1)")"
+    local layer="$(rlocation $2)"
 
     DIFF_IDS+=("\"sha256:${diff_id}\"")
 
@@ -176,8 +172,8 @@ function import_config() {
   MISSING=()
   while test $# -gt 0
   do
-    local diff_id="$(cat "${RUNFILES}/$1")"
-    local layer="${RUNFILES}/$2"
+    local diff_id="$(cat "$(rlocation $1)")"
+    local layer="$(rlocation $2)"
     shift 2
 
     ALL_QUOTED+=("\"${diff_id}.tar\"")
@@ -208,7 +204,7 @@ EOF
 }
 
 function tag_layer() {
-  local name="$(cat "${RUNFILES}/$2")"
+  local name="$(cat "$(rlocation $2)")"
 
   local TAG="$1"
   echo "Tagging ${name} as ${TAG}"
@@ -216,7 +212,7 @@ function tag_layer() {
 }
 
 function read_variables() {
-  local file="${RUNFILES}/$1"
+  local file="$(rlocation $1)"
   local new_file="$(mktemp -t 2>/dev/null || mktemp -t 'rules_docker_new')"
   echo "${new_file}" >> "${TEMP_FILES}"
 
